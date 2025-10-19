@@ -1,5 +1,6 @@
 use axum::{Router};
 
+
 mod error;
 mod model;
 mod web;
@@ -14,3 +15,8 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:9000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
+
+
+// fn routes_static() -> Router {
+//     Router::new().nest_service("/", get_service(ServeDir::new("./")))
+// }
