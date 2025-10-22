@@ -38,22 +38,34 @@ impl IntoResponse for TodoAppError {
 
         // Match each error type to an HTTP status and user-facing message
         let (status, message) = match &self {
-            TodoAppError::NotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
-            TodoAppError::InvalidInput(_) | TodoAppError::MissingField(_) => {
-                (StatusCode::BAD_REQUEST, self.to_string())
-            }
+            
+            TodoAppError::NotFound(_) => (
+                StatusCode::NOT_FOUND, 
+                self.to_string()
+            ),
+            
+            TodoAppError::InvalidInput(_) | TodoAppError::MissingField(_) => { 
+                (
+                    StatusCode::BAD_REQUEST, 
+                    self.to_string()
+                )
+            },
+
             TodoAppError::Database(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Database connection failed".to_string(),
             ),
+
             TodoAppError::DataParseError(_) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "Failed to process stored data".to_string(),
             ),
+
             TodoAppError::Internal => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal server error".to_string(),
             ),
+
         };
 
         // Build JSON response body
