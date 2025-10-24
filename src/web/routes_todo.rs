@@ -1,12 +1,14 @@
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
     routing::{delete, get, patch, post},
     Json, Router,
 };
 use serde::Deserialize;
-
-use crate::model::{AppState, Todo, TodoService};
+use crate::{
+    auth::AuthUser,
+    error::{ApiResult, ApiError},
+    model::{AppState, Todo, TodoService},
+};
 
 #[derive(Deserialize)]
 pub struct CreateTodoRequest {
@@ -17,139 +19,159 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/todos", get(get_all_todos))
         .route("/todos", post(create_todo))
-        .route("/todos/:id", get(get_todo))
-        .route("/todos/:id/complete", patch(complete_todo))
-        .route("/todos/:id", delete(delete_todo))
+        .route("/todos/{id}", get(get_todo))
+        .route("/todos/{id}/complete", patch(complete_todo))
+        .route("/todos/{id}", delete(delete_todo))
 }
 
-// Handlers - Each extracts only TodoService, not entire AppState
+// GET /todos - Now requires authentication
 async fn get_all_todos(
     State(todo_service): State<TodoService>,
-) -> Json<Vec<Todo>> {
-    let todos = todo_service.get_all_todos().await;
-    Json(todos)
+    auth_user: AuthUser, // Extract user_id from JWT
+) -> ApiResult<Json<Vec<Todo>>> {
+    let todos = todo_service.get_all_todos(auth_user.user_id).await?;
+    Ok(Json(todos))
 }
 
+// POST /todos - Requires authentication
 async fn create_todo(
     State(todo_service): State<TodoService>,
+    auth_user: AuthUser,
     Json(payload): Json<CreateTodoRequest>,
-) -> Json<Todo> {
-    let todo = todo_service.add_todo(payload.title).await;
-    Json(todo)
+) -> ApiResult<Json<Todo>> {
+    if payload.title.trim().is_empty() {
+        return Err(ApiError::BadRequest("Title cannot be empty".into()));
+    }
+
+    if payload.title.len() > 100 {
+        return Err(ApiError::BadRequest(
+            "Title must not exceed 100 characters".into(),
+        ));
+    }
+
+    let todo = todo_service
+        .add_todo(auth_user.user_id, payload.title)
+        .await?;
+
+    Ok(Json(todo))
 }
 
+// GET /todos/:id - User can only get their own todos
 async fn get_todo(
     State(todo_service): State<TodoService>,
-    Path(id): Path<u64>,
-) -> Result<Json<Todo>, StatusCode> {
-    todo_service
-        .get_todo(id)
-        .await
-        .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+    auth_user: AuthUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<Todo>> {
+    let todo = todo_service.get_todo(id, auth_user.user_id).await?;
+    Ok(Json(todo))
 }
 
+// PATCH /todos/:id/complete - User can only complete their own todos
 async fn complete_todo(
     State(todo_service): State<TodoService>,
-    Path(id): Path<u64>,
-) -> Result<Json<Todo>, StatusCode> {
-    todo_service
-        .complete_todo(id)
-        .await
-        .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+    auth_user: AuthUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<Todo>> {
+    let todo = todo_service.complete_todo(id, auth_user.user_id).await?;
+    Ok(Json(todo))
 }
 
+// DELETE /todos/:id - User can only delete their own todos
 async fn delete_todo(
     State(todo_service): State<TodoService>,
-    Path(id): Path<u64>,
-) -> Result<Json<Todo>, StatusCode> {
-    todo_service
-        .delete_todo(id)
-        .await
-        .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+    auth_user: AuthUser,
+    Path(id): Path<i64>,
+) -> ApiResult<Json<serde_json::Value>> {
+    todo_service.delete_todo(id, auth_user.user_id).await?;
+    
+    Ok(Json(serde_json::json!({
+        "message": "Todo deleted successfully"
+    })))
 }
 
-
 // use axum::{
-//     Json, Router,
 //     extract::{Path, State},
-//     http::StatusCode,
-//     response::IntoResponse,
-//     routing::{delete, get, post},
+//     routing::{delete, get, patch, post},
+//     Json, Router,
+// };
+// use serde::Deserialize;
+// use crate::{
+//     error::{Result, TodoAppError},
+//     model::{AppState, Todo, TodoService},
 // };
 
-// use crate::error::{Result, TodoAppError};
-// use crate::model::{Todo, TodoStore};
-// use serde::Deserialize;
-// use serde_json::json;
-// use std::sync::{Arc, Mutex};
-
-// pub fn routes() -> Router<Arc<Mutex<TodoStore>>> {
-//     Router::new()
-//         .route("/api/test", post(api_todo))
-//         .route("/api/todos", get(get_all_todos).post(add_todo))
-//         .route("/api/todos/:id/complete", post(complete_todo))
-//         .route("/api/todos/:id/delete", delete(delete_todo))
-// }
-
-// async fn api_todo() -> impl IntoResponse {
-//     println!("✅ TODO testing endpoint hit");
-//     (StatusCode::OK, "Todo testing endpoint reached")
-// }
-
-// async fn get_all_todos(
-//     State(store): State<Arc<Mutex<TodoStore>>>
-// ) -> Result<Json<Vec<Todo>>> {
-//     let store = store.lock().map_err(|_| TodoAppError::Internal)?;
-//     Ok(Json(store.get_all_todos().clone()))
-// }
-
 // #[derive(Deserialize)]
-// struct NewTodo {
+// pub struct CreateTodoRequest {
 //     title: String,
 // }
 
-// async fn add_todo(
-//     State(store): State<Arc<Mutex<TodoStore>>>,
-//     Json(payload): Json<NewTodo>,
-// ) -> Result<Json<Todo>> {
-//     if payload.title.trim().is_empty() {
-//         return Err(TodoAppError::MissingField("title".to_string()));
-//     }
-
-//     let mut store = store.lock().map_err(|_| TodoAppError::Internal)?;
-//     let todo = store.add_todo(payload.title);
-//     Ok(Json(todo.clone()))
+// pub fn routes() -> Router<AppState> {
+//     Router::new()
+//         .route("/todos", get(get_all_todos))
+//         .route("/todos", post(create_todo))
+//         .route("/todos/{id}", get(get_todo))
+//         .route("/todos/{id}/complete", patch(complete_todo))
+//         .route("/todos/{id}", delete(delete_todo))
 // }
 
-// async fn complete_todo(
-//     State(store): State<Arc<Mutex<TodoStore>>>,
-//     Path(id): Path<u64>,
-// ) -> Result<impl IntoResponse> {
-//     let mut store = store.lock().map_err(|_| TodoAppError::Internal)?;
+// // GET /todos
+// async fn get_all_todos(State(todo_service): State<TodoService>) -> Result<Json<Vec<Todo>>> {
+//     // no map_err here — returns Vec<Todo> directly
+//     let todos = todo_service.get_all_todos().await;
+//     Ok(Json(todos))
+// }
 
-//     match store.complete_todo(id) {
-//         Some(todo) => Ok(Json(todo.clone()).into_response()),
+// // POST /todos
+// async fn create_todo(
+//     State(todo_service): State<TodoService>,
+//     Json(payload): Json<CreateTodoRequest>,
+// ) -> Result<Json<Todo>> {
+//     if payload.title.trim().is_empty() {
+//         return Err(TodoAppError::MissingField("title".into()));
+//     }
+
+//     if payload.title.len() > 100 {
+//         return Err(TodoAppError::InvalidInput(
+//             "Title must not exceed 100 characters".into(),
+//         ));
+//     }
+
+//     // no map_err — add_todo returns Todo
+//     let todo = todo_service.add_todo(payload.title.clone()).await;
+
+//     Ok(Json(todo))
+// }
+
+// // GET /todos/:id
+// async fn get_todo(
+//     State(todo_service): State<TodoService>,
+//     Path(id): Path<u64>,
+// ) -> Result<Json<Todo>> {
+//     // get_todo likely returns Option<Todo>
+//     match todo_service.get_todo(id).await {
+//         Some(todo) => Ok(Json(todo)),
 //         None => Err(TodoAppError::NotFound(id)),
 //     }
 // }
 
-// async fn delete_todo(
-//     State(store): State<Arc<Mutex<TodoStore>>>,
+// // PATCH /todos/:id/complete
+// async fn complete_todo(
+//     State(todo_service): State<TodoService>,
 //     Path(id): Path<u64>,
-// ) -> Result<impl IntoResponse> {
-//     let mut store = store.lock().map_err(|_| TodoAppError::Internal)?;
-//     match store.delete_todo(id) {
-//         Some(_) => Ok((
-//             StatusCode::OK,
-//             Json(json!({
-//                 "success": true,
-//                 "message": format!("Todo item {} deleted", id),
-//             })),
-//         )
-//             .into_response()),
+// ) -> Result<Json<Todo>> {
+//     match todo_service.complete_todo(id).await {
+//         Some(todo) => Ok(Json(todo)),
+//         None => Err(TodoAppError::NotFound(id)),
+//     }
+// }
+
+// // DELETE /todos/:id
+// async fn delete_todo(
+//     State(todo_service): State<TodoService>,
+//     Path(id): Path<u64>,
+// ) -> Result<Json<Todo>> {
+//     match todo_service.delete_todo(id).await {
+//         Some(todo) => Ok(Json(todo)),
 //         None => Err(TodoAppError::NotFound(id)),
 //     }
 // }
