@@ -3,8 +3,6 @@ use argon2::{
     Argon2,
 };
 
-// use async_trait::async_trait;
-
 use axum::{
     extract::FromRequestParts,
     http::request::Parts,
@@ -15,9 +13,6 @@ use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{ApiError, ApiResult};
-use futures::future::BoxFuture;
-
-// use crate::auth::verify_jwt;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {

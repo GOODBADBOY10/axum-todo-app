@@ -10,10 +10,12 @@ mod service;
 mod user;
 mod state;
 
-pub use todo::{Todo, CreateTodo, UpdateTodo};
+// pub use todo::{Todo, CreateTodo, UpdateTodo};
+pub use todo::{Todo};
 pub use service::TodoService;
 // pub use store::TodoStore;  // You can remove this later since we're using DB now
-pub use user::{User, CreateUser};
+// pub use user::{User, CreateUser};
+pub use user::{User};
 pub use state::AppState;
 
 // pub use todo::{Todo, CreateTodo, UpdateTodo};

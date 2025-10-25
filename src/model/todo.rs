@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use crate::db::DbPool;
-use crate::error::ApiResult;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Todo {
@@ -11,16 +10,16 @@ pub struct Todo {
     pub completed: bool,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct CreateTodo {
-    pub title: String,
-}
+// #[derive(Debug, Deserialize)]
+// pub struct CreateTodo {
+//     pub title: String,
+// }
 
-#[derive(Debug, Deserialize)]
-pub struct UpdateTodo {
-    pub title: Option<String>,
-    pub completed: Option<bool>,
-}
+// #[derive(Debug, Deserialize)]
+// pub struct UpdateTodo {
+//     pub title: Option<String>,
+//     pub completed: Option<bool>,
+// }
 
 impl Todo {
     /// Create a new todo for a user
